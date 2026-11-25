@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SoundSticker">
+<link rel="manifest" href="manifest.json">
+<title>SoundSticker</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#141f31;--muted:#9aabc2;--accent:#27d69b;--line:#29384e}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#101b2e,#080d17 65%);font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f4f7fb;min-height:100vh}
+main{max-width:620px;margin:auto;padding:24px 18px 48px}.brand{display:flex;align-items:center;gap:12px;margin:10px 0 25px}.logo{width:48px;height:48px;border-radius:15px;background:var(--accent);display:grid;place-items:center;color:#082017;font-size:25px;font-weight:900}.brand h1{font-size:23px;margin:0}.brand p{margin:3px 0 0;color:var(--muted);font-size:13px}
+h2{font-size:20px;margin:0 0 8px}.lead{color:var(--muted);line-height:1.5;margin:0 0 20px}.panel{background:rgba(20,31,49,.94);border:1px solid var(--line);border-radius:20px;padding:18px;margin:15px 0;box-shadow:0 12px 30px #0003}
+.pick{display:block;border:1.5px dashed #52647e;border-radius:16px;padding:23px 15px;text-align:center;background:#101a2a;cursor:pointer}.pick strong{display:block;margin:8px 0 4px}.pick small{color:var(--muted)}input[type=file]{display:none}
+video{width:100%;max-height:360px;background:#05080d;border-radius:14px;margin-top:15px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:15px 0}.tab{padding:13px;border:1px solid var(--line);border-radius:13px;background:#101a2a;color:#dce7f4;font-weight:700}.tab.active{border-color:var(--accent);background:#12382f;color:#baffdf}
+button,.action{border:0;border-radius:13px;padding:14px 16px;background:var(--accent);color:#062117;font-size:15px;font-weight:800;width:100%;cursor:pointer;margin-top:10px}
+button.secondary{background:#26364d;color:#f1f6ff}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.status{font-size:13px;color:var(--muted);line-height:1.5;margin-top:12px}.notice{background:#332b19;border:1px solid #69552b;color:#f7e6b9;padding:13px;border-radius:13px;font-size:13px;line-height:1.5;margin-top:13px}
+label{font-size:13px;color:var(--muted);display:block;margin:14px 0 6px}input[type=range]{width:100%;accent-color:var(--accent)}.hidden{display:none!important}.preview-wrap{display:none}
+footer{text-align:center;color:#71839c;font-size:12px;padding:20px 0}
+</style>
+</head>
+<body><main>
+<header class="brand"><div class="logo">S</div><div><h1>SoundSticker</h1><p>Tu video, listo para compartir</p></div></header>
+<h2>Convierte tu video</h2>
+<p class="lead">Selecciona un video de tu iPhone. Puedes conservar su audio para compartirlo como video o crear un sticker estático en WebP.</p>
+<section class="panel">
+<label class="pick" for="file"><div style="font-size:30px">＋</div><strong>Elegir video de la galería</strong><small>MP4, MOV y otros formatos compatibles con Safari</small></label>
+<input id="file" type="file" accept="video/*">
+<div id="previewWrap" class="preview-wrap"><video id="video" controls playsinline></video><div class="status" id="fileInfo"></div></div>
+</section>
+<div class="tabs"><button class="tab active" id="videoTab" type="button">🎬 Video con sonido</button><button class="tab" id="stickerTab" type="button">✨ Sticker WebP</button></div>
+<section class="panel" id="videoPanel">
+<h2>Compartir con audio</h2><p class="lead">Conserva el sonido original. Se compartirá como video normal de WhatsApp, no como sticker.</p>
+<button id="shareVideo" disabled>Compartir video</button>
+<button id="downloadVideo" class="secondary" disabled>Guardar video</button>
+<p class="status" id="videoStatus">Primero selecciona un video.</p>
+</section>
+<section class="panel hidden" id="stickerPanel">
+<h2>Crear sticker estático</h2><p class="lead">Elige un momento del video y SoundSticker lo exportará como imagen WebP, un formato usado para stickers.</p>
+<label for="frame">Momento del video</label><input id="frame" type="range" min="0" max="1000" value="0" disabled>
+<div class="buttons"><button id="capture" disabled>Capturar fotograma</button><button id="saveSticker" class="secondary" disabled>Guardar WebP</button></div>
+<canvas id="canvas" width="512" height="512" style="width:100%;max-height:320px;object-fit:contain;background:#080d17;border-radius:14px;margin-top:14px"></canvas>
+<p class="status" id="stickerStatus">El sticker generado será estático y sin sonido. WhatsApp puede requerir que lo importes mediante una aplicación compatible con paquetes de stickers.</p>
+<div class="notice"><b>Importante:</b> esta versión no crea stickers animados con sonido. WhatsApp no permite insertar audio en el formato WebP de sticker tradicional, y la disponibilidad de Sound Stickers en iOS no está confirmada.</div>
+</section>
+<footer>SoundSticker · Procesamiento local en tu dispositivo cuando el navegador lo permite.</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let file=null,url=null,stickerBlob=null;
+const video=$('video'),canvas=$('canvas'),ctx=canvas.getContext('2d');
+function setMode(mode){
+ const v=mode==='video';$('videoTab').classList.toggle('active',v);$('stickerTab').classList.toggle('active',!v);
+ $('videoPanel').classList.toggle('hidden',!v);$('stickerPanel').classList.toggle('hidden',v);
+}
+$('videoTab').onclick=()=>setMode('video');$('stickerTab').onclick=()=>setMode('sticker');
+$('file').addEventListener('change',()=>{
+ file=$('file').files[0];if(!file)return;
+ if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file);video.src=url;
+ $('previewWrap').style.display='block';$('fileInfo').textContent=`${file.name} · ${(file.size/1048576).toFixed(1)} MB`;
+ $('shareVideo').disabled=false;$('downloadVideo').disabled=false;$('frame').disabled=false;
+ video.onloadedmetadata=()=>{$('frame').max=Math.max(1,Math.round(video.duration*10));$('frame').value=0;$('frame').oninput=()=>{video.currentTime=Number($('frame').value)/10};};
+ $('videoStatus').textContent='Video cargado. El audio original se conserva al compartir el archivo.';
+ $('stickerStatus').textContent='Mueve el control hasta el momento que quieras convertir en sticker.';
+});
+$('shareVideo').onclick=async()=>{
+ if(!file)return;
+ try{
+  if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:'Video desde SoundSticker'});
+   $('videoStatus').textContent='Se abrió el menú para compartir de iOS.';
+  }else{$('videoStatus').textContent='Tu navegador no permite compartir el archivo directamente. Usa “Guardar video” y adjúntalo desde WhatsApp.';}
+ }catch(e){if(e.name!=='AbortError')$('videoStatus').textContent='No se pudo abrir compartir. Guarda el video y adjúntalo desde WhatsApp.';}
+};
+$('downloadVideo').onclick=()=>{if(!file)return;const a=document.createElement('a');a.href=url;a.download=file.name||'video.mp4';a.click();};
+$('capture').onclick=()=>{
+ if(!file||!video.videoWidth)return;
+ const w=video.videoWidth,h=video.videoHeight,scale=Math.min(512/w,512/h);
+ const dw=Math.round(w*scale),dh=Math.round(h*scale);ctx.clearRect(0,0,512,512);
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,512,512);ctx.drawImage(video,(512-dw)/2,(512-dh)/2,dw,dh);
+ canvas.toBlob(b=>{stickerBlob=b;$('saveSticker').disabled=!b;$('stickerStatus').textContent=b?'Fotograma convertido a WebP. Ya puedes guardarlo.':'No se pudo generar WebP en este navegador.';},'image/webp',0.9);
+};
+$('saveSticker').onclick=()=>{if(!stickerBlob)return;const a=document.createElement('a');a.href=URL.createObjectURL(stickerBlob);a.download='soundsticker.webp';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);};
+$('capture').disabled=true;
+video.addEventListener('loadeddata',()=>{$('capture').disabled=false;});
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script></body></html>
